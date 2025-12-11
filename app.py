@@ -387,22 +387,69 @@ def main():
             st.balloons()
             st.success(f"Финиш! Твой счет: {st.session_state.score} из {len(st.session_state.quiz_data)}")
 
-    # --- 7. ПОИСК ---
+    # --- 7. ПОИСК (PRO) ---
     with tab_search:
-        st.header("🕵️ Поиск")
-        query = st.text_input("Поиск...", placeholder="Введите фразу")
+        st.header("🕵️ Поиск по архиву")
+        
+        # Поле ввода
+        query = st.text_input("Поиск...", placeholder="Введите слово или фразу")
+        
         if query:
+            # Фильтрация
             mask = df['text'].str.contains(query, case=False, na=False)
-            res = df[mask].sort_values('date', ascending=False)
-            st.info(f"Найдено: {len(res)}")
-            for _, row in res.head(10).iterrows():
-                with st.chat_message(row['username']):
-                    st.write(f"**{row['username']}** ({row['date'].strftime('%d.%m %Y')})")
-                    st.write(row['text'])
-                    if row['reaction_count'] > 0:
-                        st.caption(f"❤️ {row['reaction_count']}")
-                    if row['is_forwarded']:
-                        st.caption("↪️ Пересланное сообщение")
-
+            res = df[mask].sort_values('date', ascending=False) # Сначала новые
+            
+            if not res.empty:
+                st.success(f"Найдено сообщений: {len(res)}")
+                
+                # --- 1. ТОП АВТОРОВ ПО ЗАПРОСУ ---
+                st.subheader(f"Кто чаще пишет «{query}»?")
+                
+                # Считаем статистику
+                user_counts = res['username'].value_counts().reset_index()
+                user_counts.columns = ['Автор', 'Кол-во раз']
+                
+                # Рисуем график
+                fig_bar = px.bar(
+                    user_counts, 
+                    x='Автор', 
+                    y='Кол-во раз', 
+                    color='Автор', 
+                    text='Кол-во раз',
+                    template="plotly_dark"
+                )
+                fig_bar.update_traces(textposition='outside')
+                st.plotly_chart(fig_bar, use_container_width=True)
+                
+                st.divider()
+                
+                # --- 2. ТАБЛИЦА С ПРОКРУТКОЙ ---
+                st.subheader("Хронология сообщений")
+                
+                # Готовим красивую таблицу
+                display_df = res[['date', 'username', 'text', 'reaction_count', 'is_forwarded']].copy()
+                display_df.rename(columns={
+                    'date': 'Дата', 
+                    'username': 'Автор', 
+                    'text': 'Сообщение',
+                    'reaction_count': 'Лайки',
+                    'is_forwarded': 'Репост'
+                }, inplace=True)
+                
+                # Отображаем
+                st.dataframe(
+                    display_df,
+                    column_config={
+                        "Дата": st.column_config.DatetimeColumn("Время", format="D MMM YYYY, HH:mm"),
+                        "Лайки": st.column_config.NumberColumn("❤️", format="%d"),
+                        "Репост": st.column_config.CheckboxColumn("↪️"),
+                        "Сообщение": st.column_config.TextColumn("Текст", width="large")
+                    },
+                    use_container_width=True,
+                    height=600, # Фиксированная высота включает скролл
+                    hide_index=True
+                )
+            else:
+                st.warning("Ничего не найдено.")
 if __name__ == "__main__":
     main()
