@@ -1,0 +1,8 @@
+streamlit
+pandas
+plotly
+sqlalchemy
+pymorphy3
+aiogram>=3.0
+rapidfuzz
+setuptools
